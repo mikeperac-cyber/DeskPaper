@@ -18,19 +18,30 @@ function wrapText(
   maxWidth: number
 ): string[] {
   const words = text.split(" ");
-  const lines: string[] = [];
-  let currentLine = "";
+  if (words.length === 0) return [""];
 
+  const spaceWidth = ctx.measureText(" ").width;
+  const wordWidths: number[] = new Array(words.length);
   for (let i = 0; i < words.length; i++) {
+    wordWidths[i] = ctx.measureText(words[i]).width;
+  }
+
+  const lines: string[] = [];
+  let currentLine = words[0];
+  let currentLineWidth = wordWidths[0];
+
+  for (let i = 1; i < words.length; i++) {
     const word = words[i];
-    const testLine = currentLine ? currentLine + " " + word : word;
-    const testWidth = ctx.measureText(testLine).width;
+    const wordWidth = wordWidths[i];
+    const testWidth = currentLineWidth + spaceWidth + wordWidth;
 
     if (testWidth > maxWidth && currentLine) {
       lines.push(currentLine);
       currentLine = word;
+      currentLineWidth = wordWidth;
     } else {
-      currentLine = testLine;
+      currentLine = currentLine ? currentLine + " " + word : word;
+      currentLineWidth = testWidth;
     }
   }
 

@@ -2,15 +2,13 @@ import React, { useState, useEffect, useRef } from "react";
 import { Note, HardwareSettings, DISPLAY_PRESETS } from "../types/note";
 import { renderNoteToBuffer, RenderResult } from "../engine/rasterizer";
 import { serialManager, SerialStatus } from "../serial/serialManager";
+import { logger } from "../utils/logger";
 import {
   Monitor,
   RefreshCw,
-  Zap,
   PowerOff,
   Maximize2,
   Minimize2,
-  CheckCircle2,
-  Cpu,
   Layers,
 } from "lucide-react";
 
@@ -59,7 +57,7 @@ export const VirtualEPaper: React.FC<VirtualEPaperProps> = ({
       }
       lastRenderedNoteRef.current = noteSignature;
     } catch (err) {
-      console.error("Failed to render note to E-Paper buffer", err);
+      logger.error("Failed to render note to E-Paper buffer", err);
     }
   }, [note, settings]);
 

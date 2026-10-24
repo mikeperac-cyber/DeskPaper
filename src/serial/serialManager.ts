@@ -1,4 +1,5 @@
 import { buildBitmapPacket, buildPingPacket } from "./protocol";
+import { logger } from "../utils/logger";
 
 export type SerialState =
   | "disconnected"
@@ -123,7 +124,7 @@ class SerialManager {
         this.port = null;
       }
     } catch (e) {
-      console.warn("Error closing serial port:", e);
+      logger.warn("Error closing serial port:", e);
     } finally {
       this.updateStatus({
         state: "disconnected",
@@ -212,7 +213,7 @@ class SerialManager {
       });
       return true;
     } catch (err: any) {
-      console.error("Serial transmission error:", err);
+      logger.error("Serial transmission error:", err);
       this.updateStatus({
         state: "error",
         errorMessage: err.message || "Failed to send data over serial",

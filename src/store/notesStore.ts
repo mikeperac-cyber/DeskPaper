@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Note, HardwareSettings, NoteColor } from "../types/note";
+import { logger } from "../utils/logger";
 
 const STORAGE_KEY_NOTES = "deskpaper_notes_v1";
 const STORAGE_KEY_SETTINGS = "deskpaper_settings_v1";
@@ -108,7 +109,7 @@ export function useNotesStore() {
     try {
       localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(notes));
     } catch (e) {
-      console.error("Failed to save notes to storage", e);
+      logger.error("Failed to save notes to storage", e);
     }
   }, [notes]);
 
@@ -116,7 +117,7 @@ export function useNotesStore() {
     try {
       localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
     } catch (e) {
-      console.error("Failed to save settings to storage", e);
+      logger.error("Failed to save settings to storage", e);
     }
   }, [settings]);
 
@@ -126,7 +127,7 @@ export function useNotesStore() {
         localStorage.setItem(STORAGE_KEY_CASTED, castedNoteId);
       }
     } catch (e) {
-      console.error("Failed to save casted note ID", e);
+      logger.error("Failed to save casted note ID", e);
     }
   }, [castedNoteId]);
 

@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNotesStore } from "./store/notesStore";
 import { StudioDeck } from "./components/StudioDeck";
 import { DeskBoard } from "./components/DeskBoard";
 import { HardwareModal } from "./components/HardwareModal";
 import { serialManager } from "./serial/serialManager";
 import { renderNoteToBuffer } from "./engine/rasterizer";
+import { logger } from "./utils/logger";
 
 export function App() {
   const {
@@ -42,7 +43,7 @@ export function App() {
         );
       }
     } catch (err) {
-      console.error("Error during casting to E-Paper:", err);
+      logger.error("Error during casting to E-Paper:", err);
     }
   };
 

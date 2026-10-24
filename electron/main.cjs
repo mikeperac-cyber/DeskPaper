@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const url = require("url");
 
 let mainWindow = null;
 
@@ -73,6 +74,92 @@ function createWindow() {
   });
 }
 
+/**
+ * Sanitizes a string for use as a safe filename or shortcut title.
+ * - Strips ASCII control characters (0-31 and 127)
+ * - Removes invalid filename characters: \ / : * ? " < > |
+ * - Avoids Windows reserved filenames (CON, PRN, AUX, NUL, COM1-9, LPT1-9)
+ * - Strips relative path navigation segments (..)
+ * - Trims trailing dots and spaces
+ * - Limits max length to 100 characters
+ */
+function sanitizeFilename(input, fallback = "Sticky Note") {
+  if (typeof input !== "string") {
+    return fallback;
+  }
+
+  // Strip control characters (0-31, 127) and invalid filename characters
+  let clean = input
+    .replace(/[\x00-\x1F\x7F]/g, "")
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .replace(/\.\.+/g, "_")
+    .trim();
+
+  // Strip trailing periods and spaces (problematic on Windows)
+  clean = clean.replace(/[.\s]+$/g, "");
+
+  // Check against Windows reserved file names
+  const reservedRegex = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$/i;
+  if (!clean || reservedRegex.test(clean)) {
+    clean = fallback;
+  }
+
+  // Truncate to reasonable max length
+  if (clean.length > 100) {
+    clean = clean.substring(0, 100).trim().replace(/[.\s]+$/g, "");
+  }
+
+  return clean || fallback;
+}
+
+/**
+ * Creates a desktop or folder shortcut to DeskPaper executable securely.
+ * On Windows, shell.writeShortcutLink creates native .lnk shortcuts.
+ * On other platforms or as fallback, writes a .url file with properly formatted file:// URL.
+ */
+function createDeskPaperShortcut(targetDirPath, shortcutFileNameWithoutExt) {
+  const safeBaseName = sanitizeFilename(shortcutFileNameWithoutExt, "DeskPaper Shortcut");
+  const exePath = process.execPath;
+
+  if (process.platform === "win32") {
+    const shortcutPath = path.join(targetDirPath, safeBaseName + ".lnk");
+    const success = shell.writeShortcutLink(shortcutPath, "create", {
+      target: exePath,
+      cwd: path.dirname(exePath),
+      description: "DeskPaper - E-Ink Sticky Notes",
+      icon: exePath,
+      iconIndex: 0,
+    });
+    if (success) {
+      return true;
+    }
+  }
+
+  // Cross-platform / fallback .url shortcut format
+  const shortcutPath = path.join(targetDirPath, safeBaseName + ".url");
+  const fileUrl = url.pathToFileURL(exePath).href;
+  const safeExePath = exePath.replace(/[\r\n]/g, "");
+
+  const urlContent = [
+    "[InternetShortcut]",
+    "URL=" + fileUrl,
+    "IconIndex=0",
+    "IconFile=" + safeExePath,
+    "",
+  ].join("\r\n");
+
+  fs.writeFileSync(shortcutPath, urlContent, "utf8");
+  return true;
+}
+
+// Export functions for unit testing in Node environment
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    sanitizeFilename,
+    createDeskPaperShortcut,
+  };
+}
+
 // IPC Handlers
 ipcMain.handle("desktop:select-folder", async () => {
   if (!mainWindow) return null;
@@ -97,30 +184,28 @@ ipcMain.handle("desktop:sync-folder-note", async (event, { folderPath, note }) =
   if (!folderPath || !fs.existsSync(folderPath)) return false;
   try {
     const noteFilePath = path.join(folderPath, "NOTE.md");
+    const safeTitle = sanitizeFilename(note ? note.title : "", "Sticky Note");
 
     // Format content as clean markdown
-    let mdContent = "# " + (note.title || "Sticky Note") + "\n\n";
-    if (note.tags && note.tags.length > 0) {
+    let mdContent = "# " + safeTitle + "\n\n";
+    if (note && note.tags && note.tags.length > 0) {
       mdContent += "Tags: " + note.tags.map(t => "#" + t).join(" ") + "\n\n";
     }
     mdContent += "*Last synced via DeskPaper: " + new Date().toLocaleString() + "*\n\n---\n\n";
 
-    if (note.mode === "checklist") {
+    if (note && note.mode === "checklist") {
       const items = note.checklist || [];
       for (const item of items) {
         mdContent += "- [" + (item.completed ? "x" : " ") + "] " + item.text + "\n";
       }
     } else {
-      mdContent += note.content || "";
+      mdContent += (note && note.content) || "";
     }
 
     fs.writeFileSync(noteFilePath, mdContent, "utf8");
 
     // Write a shortcut inside the folder that opens DeskPaper
-    const shortcutPath = path.join(folderPath, "Open_In_DeskPaper.url");
-    const exePath = process.execPath;
-    const urlContent = "[InternetShortcut]\nURL=file:///" + exePath.replace(/\\/g, "/") + "\nIconIndex=0\nIconFile=" + exePath.replace(/\\/g, "/") + "\n";
-    fs.writeFileSync(shortcutPath, urlContent, "utf8");
+    createDeskPaperShortcut(folderPath, "Open_In_DeskPaper");
 
     return true;
   } catch (err) {
@@ -132,13 +217,10 @@ ipcMain.handle("desktop:sync-folder-note", async (event, { folderPath, note }) =
 ipcMain.handle("desktop:create-shortcut", async (event, note) => {
   try {
     const desktopPath = app.getPath("desktop");
-    const sanitizedTitle = (note.title || "Sticky Note").replace(/[\\/:*?"<>|]/g, "_");
-    const shortcutPath = path.join(desktopPath, "DeskPaper - " + sanitizedTitle + ".url");
+    const title = (note && note.title) || "Sticky Note";
+    const safeTitle = sanitizeFilename(title, "Sticky Note");
 
-    const exePath = process.execPath;
-    const urlContent = "[InternetShortcut]\nURL=file:///" + exePath.replace(/\\/g, "/") + "\nIconIndex=0\nIconFile=" + exePath.replace(/\\/g, "/") + "\n";
-    fs.writeFileSync(shortcutPath, urlContent, "utf8");
-    return true;
+    return createDeskPaperShortcut(desktopPath, "DeskPaper - " + safeTitle);
   } catch (err) {
     console.error("Failed to create desktop shortcut:", err);
     return false;

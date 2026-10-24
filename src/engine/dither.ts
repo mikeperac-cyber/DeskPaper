@@ -2,6 +2,13 @@
  * Monochrome dithering algorithms for 1-bit E-Paper displays
  */
 
+/**
+ * Calculates standard perceptual luminance from RGB color components.
+ */
+export function calculateLuminance(r: number, g: number, b: number): number {
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+}
+
 export function applyThreshold(
   imageData: ImageData,
   threshold: number = 128
@@ -10,8 +17,7 @@ export function applyThreshold(
   const mono = new Uint8Array(width * height);
 
   for (let i = 0; i < data.length; i += 4) {
-    // Standard perceptual luminance
-    const luma = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    const luma = calculateLuminance(data[i], data[i + 1], data[i + 2]);
     const pixelIndex = i / 4;
     // In e-paper: 1 is white (background), 0 is black (ink)
     mono[pixelIndex] = luma >= threshold ? 1 : 0;
@@ -27,8 +33,11 @@ export function applyFloydSteinberg(imageData: ImageData): Uint8Array {
   // Floating-point luminance buffer for error diffusion
   const lumaBuffer = new Float32Array(width * height);
   for (let i = 0; i < data.length; i += 4) {
-    lumaBuffer[i / 4] =
-      0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    lumaBuffer[i / 4] = calculateLuminance(
+      data[i],
+      data[i + 1],
+      data[i + 2]
+    );
   }
 
   for (let y = 0; y < height; y++) {

@@ -11,7 +11,7 @@
     "build": "tsc -b && vite build",
     "electron:dev": "electron .",
     "dist:win": "node scripts/build-exe.cjs",
-    "test": "node tests/test_rasterizer_protocol.mjs",
+    "test": "node tests/test_rasterizer_protocol.mjs && node tests/test_path_security.mjs",
     "postinstall": "node scripts/patch-vite.cjs",
     "lint": "oxlint",
     "preview": "vite preview"
@@ -28,7 +28,9 @@
       "package.json"
     ],
     "win": {
-      "target": ["portable"]
+      "target": [
+        "portable"
+      ]
     }
   },
   "dependencies": {

@@ -1,24 +1,38 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
+let electron;
+try {
+  electron = require("electron");
+} catch (_) {
+  electron = null;
+}
 const path = require("path");
 const fs = require("fs");
 const url = require("url");
 
+const isElectronRuntime = typeof electron === "object" && electron !== null && !!electron.app;
+const app = isElectronRuntime ? electron.app : null;
+const BrowserWindow = isElectronRuntime ? electron.BrowserWindow : null;
+const ipcMain = isElectronRuntime ? electron.ipcMain : null;
+const dialog = isElectronRuntime ? electron.dialog : null;
+const shell = isElectronRuntime ? electron.shell : null;
+
 let mainWindow = null;
 
-// Ensure single instance
-const gotTheLock = app.requestSingleInstanceLock();
-if (!gotTheLock) {
-  app.quit();
-  process.exit(0);
-}
-
-app.on("second-instance", () => {
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
+if (app) {
+  // Ensure single instance
+  const gotTheLock = app.requestSingleInstanceLock();
+  if (!gotTheLock) {
+    app.quit();
+    process.exit(0);
   }
-});
+
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -72,6 +86,71 @@ function createWindow() {
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+}
+
+const allowedFolders = new Set();
+
+/**
+ * Validates whether a given folder path is safe and allowed to be accessed or opened.
+ * - Must be a non-empty string
+ * - Must resolve to an absolute path
+ * - Must exist on disk and be a directory (not an executable or arbitrary file)
+ * - Must either be inside standard user directories (Desktop, Documents, Downloads, Home)
+ *   or explicitly allowed via user folder selection (`allowedFolders`).
+ */
+function isAllowedFolderPath(folderPath) {
+  if (typeof folderPath !== "string" || !folderPath.trim()) {
+    return false;
+  }
+
+  try {
+    const resolvedPath = path.resolve(folderPath);
+
+    // Verify existence and ensure target is a directory
+    if (!fs.existsSync(resolvedPath)) {
+      return false;
+    }
+
+    const stat = fs.statSync(resolvedPath);
+    if (!stat.isDirectory()) {
+      return false;
+    }
+
+    // Check if path is in explicitly allowed folders (selected by user)
+    if (allowedFolders.has(resolvedPath)) {
+      return true;
+    }
+
+    // Also check if path is under standard allowed user directories if app is ready
+    const allowedRoots = [];
+    if (typeof app !== "undefined" && app && typeof app.getPath === "function") {
+      const userPaths = ["desktop", "documents", "downloads", "userData"];
+      for (const p of userPaths) {
+        try {
+          const userDir = app.getPath(p);
+          if (userDir) {
+            allowedRoots.push(path.resolve(userDir));
+          }
+        } catch (_) {}
+      }
+    }
+
+    const isSubdirectoryOf = (parent, dir) => {
+      const relative = path.relative(parent, dir);
+      return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+    };
+
+    for (const root of allowedRoots) {
+      if (isSubdirectoryOf(root, resolvedPath)) {
+        return true;
+      }
+    }
+
+    return false;
+  } catch (err) {
+    console.error("[DeskPaper] Path validation error:", err);
+    return false;
+  }
 }
 
 /**
@@ -157,11 +236,14 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     sanitizeFilename,
     createDeskPaperShortcut,
+    isAllowedFolderPath,
+    allowedFolders,
   };
 }
 
 // IPC Handlers
-ipcMain.handle("desktop:select-folder", async () => {
+if (ipcMain) {
+  ipcMain.handle("desktop:select-folder", async () => {
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
     title: "Select Windows Folder to Pin Sticky Note",
@@ -171,19 +253,23 @@ ipcMain.handle("desktop:select-folder", async () => {
   if (result.canceled || result.filePaths.length === 0) {
     return null;
   }
-  return result.filePaths[0];
+  const selectedPath = path.resolve(result.filePaths[0]);
+  allowedFolders.add(selectedPath);
+  return selectedPath;
 });
 
 ipcMain.handle("desktop:open-folder", async (event, folderPath) => {
-  if (!folderPath || !fs.existsSync(folderPath)) return false;
-  await shell.openPath(folderPath);
+  if (!isAllowedFolderPath(folderPath)) return false;
+  const resolvedPath = path.resolve(folderPath);
+  await shell.openPath(resolvedPath);
   return true;
 });
 
 ipcMain.handle("desktop:sync-folder-note", async (event, { folderPath, note }) => {
-  if (!folderPath || !fs.existsSync(folderPath)) return false;
+  if (!isAllowedFolderPath(folderPath)) return false;
+  const resolvedPath = path.resolve(folderPath);
   try {
-    const noteFilePath = path.join(folderPath, "NOTE.md");
+    const noteFilePath = path.join(resolvedPath, "NOTE.md");
     const safeTitle = sanitizeFilename(note ? note.title : "", "Sticky Note");
 
     // Format content as clean markdown
@@ -205,7 +291,7 @@ ipcMain.handle("desktop:sync-folder-note", async (event, { folderPath, note }) =
     fs.writeFileSync(noteFilePath, mdContent, "utf8");
 
     // Write a shortcut inside the folder that opens DeskPaper
-    createDeskPaperShortcut(folderPath, "Open_In_DeskPaper");
+    createDeskPaperShortcut(resolvedPath, "Open_In_DeskPaper");
 
     return true;
   } catch (err) {
@@ -216,7 +302,7 @@ ipcMain.handle("desktop:sync-folder-note", async (event, { folderPath, note }) =
 
 ipcMain.handle("desktop:create-shortcut", async (event, note) => {
   try {
-    const desktopPath = app.getPath("desktop");
+    const desktopPath = app ? app.getPath("desktop") : "";
     const title = (note && note.title) || "Sticky Note";
     const safeTitle = sanitizeFilename(title, "Sticky Note");
 
@@ -226,8 +312,10 @@ ipcMain.handle("desktop:create-shortcut", async (event, note) => {
     return false;
   }
 });
+}
 
-app.whenReady().then(() => {
+if (app) {
+  app.whenReady().then(() => {
   createWindow();
 
   app.on("activate", () => {
@@ -240,3 +328,4 @@ app.on("window-all-closed", () => {
     app.quit();
   }
 });
+}

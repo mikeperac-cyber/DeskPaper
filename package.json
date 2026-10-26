@@ -11,7 +11,7 @@
     "build": "tsc -b && vite build",
     "electron:dev": "electron .",
     "dist:win": "node scripts/build-exe.cjs",
-    "test": "node tests/test_rasterizer_protocol.mjs",
+    "test": "node --experimental-strip-types tests/test_rasterizer_protocol.mjs && node --experimental-strip-types tests/test_shortcut_sanitization.mjs && node --experimental-strip-types tests/test_dither.mjs && node --experimental-strip-types tests/test_folder_sync.mjs",
     "postinstall": "node scripts/patch-vite.cjs",
     "lint": "oxlint",
     "preview": "vite preview"

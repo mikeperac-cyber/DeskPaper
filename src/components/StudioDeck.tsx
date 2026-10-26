@@ -5,15 +5,11 @@ import { VirtualEPaper } from "./VirtualEPaper";
 import { COLOR_THEMES } from "./ColorPicker";
 import {
   Search,
-  Plus,
   Tv,
   Pin,
   Settings as SettingsIcon,
   CheckSquare,
   FileText,
-  Filter,
-  Monitor,
-  Sparkles,
   Layers,
   LayoutGrid,
 } from "lucide-react";
@@ -229,7 +225,7 @@ export const StudioDeck: React.FC<StudioDeckProps> = ({
                   <p className="text-[11px] text-zinc-400 line-clamp-2 leading-relaxed">
                     {note.mode === "checklist"
                       ? `${completedCount} of ${totalCount} tasks completed`
-                      : note.content.replace(/[#*\-]/g, "").trim() || "No content"}
+                      : note.content.replace(/[#*-]/g, "").trim() || "No content"}
                   </p>
 
                   {/* Card bottom tags */}

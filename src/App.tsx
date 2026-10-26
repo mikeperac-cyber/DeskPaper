@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useNotesStore } from "./store/notesStore";
-import { StudioDeck } from "./components/StudioDeck";
-import { DeskBoard } from "./components/DeskBoard";
+import { MainView } from "./components/MainView";
 import { HardwareModal } from "./components/HardwareModal";
 import { serialManager } from "./serial/serialManager";
 import { renderNoteToBuffer } from "./engine/rasterizer";
@@ -49,38 +48,21 @@ export function App() {
 
   return (
     <div className="relative min-h-screen w-full bg-zinc-950 text-zinc-100 overflow-hidden font-sans">
-      {viewMode === "studio" ? (
-        /* Central Studio Deck Window: Clean 3-pane layout */
-        <StudioDeck
-          notes={notes}
-          activeNote={activeNote}
-          castedNote={castedNote}
-          settings={settings}
-          onSelectNote={setActiveNoteId}
-          onAddNote={addNote}
-          onUpdateNote={updateNote}
-          onDeleteNote={deleteNote}
-          onTogglePin={togglePin}
-          onCastNote={handleCastNote}
-          onOpenHardwareModal={() => setIsHardwareModalOpen(true)}
-          onSwitchToDeskBoard={() => setViewMode("desk")}
-        />
-      ) : (
-        /* Desk Corkboard Window: Fullscreen freeform draggable stickies */
-        <DeskBoard
-          notes={notes}
-          activeNote={activeNote}
-          castedNote={castedNote}
-          settings={settings}
-          onSelectNote={setActiveNoteId}
-          onAddNote={addNote}
-          onUpdateNote={updateNote}
-          onTogglePin={togglePin}
-          onCastNote={handleCastNote}
-          onOpenHardwareModal={() => setIsHardwareModalOpen(true)}
-          onSwitchToStudio={() => setViewMode("studio")}
-        />
-      )}
+      <MainView
+        viewMode={viewMode}
+        notes={notes}
+        activeNote={activeNote}
+        castedNote={castedNote}
+        settings={settings}
+        onSelectNote={setActiveNoteId}
+        onAddNote={addNote}
+        onUpdateNote={updateNote}
+        onDeleteNote={deleteNote}
+        onTogglePin={togglePin}
+        onCastNote={handleCastNote}
+        onOpenHardwareModal={() => setIsHardwareModalOpen(true)}
+        onSetViewMode={setViewMode}
+      />
 
       {/* Hardware Configuration Modal */}
       <HardwareModal

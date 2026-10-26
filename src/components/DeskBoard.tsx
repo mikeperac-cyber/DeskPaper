@@ -2,11 +2,10 @@ import React from "react";
 import { Note, HardwareSettings, NoteColor } from "../types/note";
 import { FloatingNote } from "./FloatingNote";
 import { VirtualEPaper } from "./VirtualEPaper";
-import { Plus, CheckSquare, FileText, ArrowLeft, Settings as SettingsIcon } from "lucide-react";
+import { CheckSquare, FileText, ArrowLeft, Settings as SettingsIcon } from "lucide-react";
 
 interface DeskBoardProps {
   notes: Note[];
-  activeNote: Note | null;
   castedNote: Note | null;
   settings: HardwareSettings;
   onSelectNote: (id: string) => void;
@@ -20,7 +19,6 @@ interface DeskBoardProps {
 
 export const DeskBoard: React.FC<DeskBoardProps> = ({
   notes,
-  activeNote,
   castedNote,
   settings,
   onSelectNote,

@@ -1,4 +1,7 @@
 import { buildBitmapPacket, buildPingPacket } from "./protocol";
+import { SerialTransport } from "./transport";
+import { WebSerialTransport } from "./webSerialTransport";
+import { MockSerialTransport } from "./mockSerialTransport";
 import { logger } from "../utils/logger";
 
 export type SerialState =
@@ -19,9 +22,10 @@ export interface SerialStatus {
 
 type StatusListener = (status: SerialStatus) => void;
 
-class SerialManager {
-  private port: any = null;
-  private writer: any = null;
+export class SerialManager {
+  private activeTransport: SerialTransport | null = null;
+  private realTransport: SerialTransport;
+  private mockTransport: SerialTransport;
   private listeners: Set<StatusListener> = new Set();
   private isMockMode: boolean = false;
 
@@ -32,8 +36,16 @@ class SerialManager {
     progressPercent: 0,
   };
 
+  constructor(
+    realTransport?: SerialTransport,
+    mockTransport?: SerialTransport
+  ) {
+    this.realTransport = realTransport || new WebSerialTransport();
+    this.mockTransport = mockTransport || new MockSerialTransport();
+  }
+
   public isSupported(): boolean {
-    return typeof navigator !== "undefined" && "serial" in navigator;
+    return this.realTransport.isSupported();
   }
 
   public getStatus(): SerialStatus {
@@ -54,14 +66,18 @@ class SerialManager {
   }
 
   public setMockMode(enabled: boolean) {
+    const previousMockMode = this.isMockMode;
     this.isMockMode = enabled;
+
     if (enabled && this.status.state === "disconnected") {
+      this.activeTransport = this.mockTransport;
       this.updateStatus({
         state: "connected",
         portName: "Virtual COM (Desk Simulator)",
         errorMessage: undefined,
       });
-    } else if (!enabled && this.isMockMode) {
+    } else if (!enabled && previousMockMode) {
+      this.activeTransport = null;
       this.updateStatus({
         state: "disconnected",
         portName: undefined,
@@ -78,19 +94,12 @@ class SerialManager {
 
     try {
       this.updateStatus({ state: "connecting", errorMessage: undefined });
-      const navSerial = (navigator as any).serial;
-      this.port = await navSerial.requestPort();
-      await this.port.open({ baudRate });
-
-      const info = this.port.getInfo ? this.port.getInfo() : {};
-      const portName = info.usbVendorId
-        ? `USB Device (VID: 0x${info.usbVendorId.toString(16)})`
-        : "Connected USB Serial Port";
-
+      const result = await this.realTransport.connect(baudRate);
+      this.activeTransport = this.realTransport;
       this.isMockMode = false;
       this.updateStatus({
         state: "connected",
-        portName,
+        portName: result.portName,
         errorMessage: undefined,
       });
       return true;
@@ -115,13 +124,9 @@ class SerialManager {
     }
 
     try {
-      if (this.writer) {
-        await this.writer.close();
-        this.writer = null;
-      }
-      if (this.port) {
-        await this.port.close();
-        this.port = null;
+      if (this.activeTransport) {
+        await this.activeTransport.disconnect();
+        this.activeTransport = null;
       }
     } catch (e) {
       logger.warn("Error closing serial port:", e);
@@ -160,52 +165,25 @@ class SerialManager {
       progressPercent: 0,
     });
 
-    if (this.isMockMode || !this.port) {
-      // Simulate physical serial transfer timing (in ~512 byte chunks)
-      const chunkSize = 512;
-      let sent = 0;
-      while (sent < totalBytes) {
-        const nextChunk = Math.min(chunkSize, totalBytes - sent);
-        sent += nextChunk;
-        const progress = Math.round((sent / totalBytes) * 100);
-        this.updateStatus({
-          bytesTransferred: sent,
-          progressPercent: progress,
-        });
-        await new Promise((r) => setTimeout(r, 20)); // realistic transfer delay
-      }
+    const transport = this.activeTransport || (this.isMockMode ? this.mockTransport : null);
 
-      await new Promise((r) => setTimeout(r, 100)); // E-paper refresh time
+    if (!transport) {
       this.updateStatus({
-        state: "connected",
-        bytesTransferred: totalBytes,
-        progressPercent: 100,
+        state: "error",
+        errorMessage: "No active serial transport connected",
       });
-      return true;
+      return false;
     }
 
     try {
-      const writer = this.port.writable.getWriter();
-      const chunkSize = 512;
-      let sent = 0;
-
-      for (let offset = 0; offset < totalBytes; offset += chunkSize) {
-        const chunk = data.subarray(
-          offset,
-          Math.min(offset + chunkSize, totalBytes)
-        );
-        await writer.write(chunk);
-        sent += chunk.length;
-        const progress = Math.round((sent / totalBytes) * 100);
+      await transport.write(data, (bytesTransferred, total) => {
+        const progress = Math.round((bytesTransferred / total) * 100);
         this.updateStatus({
-          bytesTransferred: sent,
+          bytesTransferred,
           progressPercent: progress,
         });
-        // Tiny 5ms delay to prevent buffer overrun on microcontrollers
-        await new Promise((r) => setTimeout(r, 5));
-      }
+      });
 
-      writer.releaseLock();
       this.updateStatus({
         state: "connected",
         bytesTransferred: totalBytes,

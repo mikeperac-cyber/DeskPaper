@@ -14,13 +14,13 @@ export function applyThreshold(
   threshold: number = 128
 ): Uint8Array {
   const { width, height, data } = imageData;
-  const mono = new Uint8Array(width * height);
+  const numPixels = width * height;
+  const mono = new Uint8Array(numPixels);
 
-  for (let i = 0; i < data.length; i += 4) {
+  for (let i = 0, p = 0; p < numPixels; i += 4, p++) {
     const luma = calculateLuminance(data[i], data[i + 1], data[i + 2]);
-    const pixelIndex = i / 4;
     // In e-paper: 1 is white (background), 0 is black (ink)
-    mono[pixelIndex] = luma >= threshold ? 1 : 0;
+    mono[p] = luma >= threshold ? 1 : 0;
   }
 
   return mono;
@@ -28,12 +28,13 @@ export function applyThreshold(
 
 export function applyFloydSteinberg(imageData: ImageData): Uint8Array {
   const { width, height, data } = imageData;
-  const mono = new Uint8Array(width * height);
+  const numPixels = width * height;
+  const mono = new Uint8Array(numPixels);
 
   // Floating-point luminance buffer for error diffusion
-  const lumaBuffer = new Float32Array(width * height);
-  for (let i = 0; i < data.length; i += 4) {
-    lumaBuffer[i / 4] = calculateLuminance(
+  const lumaBuffer = new Float32Array(numPixels);
+  for (let i = 0, p = 0; p < numPixels; i += 4, p++) {
+    lumaBuffer[p] = calculateLuminance(
       data[i],
       data[i + 1],
       data[i + 2]

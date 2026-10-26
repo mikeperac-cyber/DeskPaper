@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Note, HardwareSettings, DISPLAY_PRESETS } from "../types/note";
 import { renderNoteToBuffer, RenderResult } from "../engine/rasterizer";
 import { serialManager, SerialStatus } from "../serial/serialManager";
@@ -23,7 +23,6 @@ export const VirtualEPaper: React.FC<VirtualEPaperProps> = ({
   settings,
   onOpenHardwareModal,
 }) => {
-  const [renderResult, setRenderResult] = useState<RenderResult | null>(null);
   const [isFlashing, setIsFlashing] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [serialStatus, setSerialStatus] = useState<SerialStatus>(
@@ -36,29 +35,28 @@ export const VirtualEPaper: React.FC<VirtualEPaperProps> = ({
     return () => unsubscribe();
   }, []);
 
-  // Re-render bitmap when note or hardware settings change
-  useEffect(() => {
-    if (!note) {
-      setRenderResult(null);
-      return;
-    }
-
+  // Compute bitmap when note or hardware settings change
+  const renderResult = useMemo<RenderResult | null>(() => {
+    if (!note) return null;
     try {
-      const result = renderNoteToBuffer(note, settings);
-      setRenderResult(result);
-
-      // Trigger flash animation if note content changed or explicit refresh
-      const noteSignature = `${note.id}_${note.updatedAt}_${settings.orientation}_${settings.selectedModel}_${settings.invertColors}`;
-      if (lastRenderedNoteRef.current && lastRenderedNoteRef.current !== noteSignature) {
-        setIsFlashing(true);
-        const timer = setTimeout(() => setIsFlashing(false), 850);
-        lastRenderedNoteRef.current = noteSignature;
-        return () => clearTimeout(timer);
-      }
-      lastRenderedNoteRef.current = noteSignature;
+      return renderNoteToBuffer(note, settings);
     } catch (err) {
       logger.error("Failed to render note to E-Paper buffer", err);
+      return null;
     }
+  }, [note, settings]);
+
+  // Trigger flash animation when note content or settings change
+  useEffect(() => {
+    if (!note) return;
+    const noteSignature = `${note.id}_${note.updatedAt}_${settings.orientation}_${settings.selectedModel}_${settings.invertColors}`;
+    if (lastRenderedNoteRef.current && lastRenderedNoteRef.current !== noteSignature) {
+      setIsFlashing(true);
+      const timer = setTimeout(() => setIsFlashing(false), 850);
+      lastRenderedNoteRef.current = noteSignature;
+      return () => clearTimeout(timer);
+    }
+    lastRenderedNoteRef.current = noteSignature;
   }, [note, settings]);
 
   const handleManualFlash = async () => {

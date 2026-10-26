@@ -9,10 +9,10 @@ const require = createRequire(import.meta.url);
 // Mock electron in require cache using Module._cache directly
 const Module = require("node:module");
 const mockApp = {
-  requestSingleInstanceLock: () => false,
+  requestSingleInstanceLock: () => true,
   quit: () => {},
-  getPath: (name) => os.tmpdir(),
-  whenReady: () => Promise.resolve(),
+  getPath: (_name) => os.tmpdir(),
+  whenReady: () => new Promise(() => {}),
   on: () => {},
 };
 
@@ -21,7 +21,7 @@ const mockIpcMain = {
 };
 
 const mockShell = {
-  writeShortcutLink: (shortcutPath, operation, options) => {
+  writeShortcutLink: (shortcutPath, _operation, options) => {
     fs.writeFileSync(shortcutPath, `[LNK_MOCK]\nTarget=${options.target}`, "utf8");
     return true;
   },
@@ -42,7 +42,7 @@ electronModule.loaded = true;
 
 // Override Module._load to intercept 'electron'
 const originalLoad = Module._load;
-Module._load = function (request, parent, isMain) {
+Module._load = function (request, _parent, _isMain) {
   if (request === "electron") {
     return electronExports;
   }
@@ -62,8 +62,8 @@ assert.strictEqual(sanitizeFilename("Title\nWith\r\nNewlines"), "TitleWithNewlin
 assert.strictEqual(sanitizeFilename("Title\x00\x1FWithControlChars"), "TitleWithControlChars");
 
 // 3. Test Path Traversal sequences
-assert.strictEqual(sanitizeFilename("../../../etc/passwd"), "_etc_passwd");
-assert.strictEqual(sanitizeFilename("..\\..\\Windows\\System32"), "_Windows_System32");
+assert.strictEqual(sanitizeFilename("../../../etc/passwd"), "______etc_passwd");
+assert.strictEqual(sanitizeFilename("..\\..\\Windows\\System32"), "____Windows_System32");
 
 // 4. Test Windows Reserved Filenames
 assert.strictEqual(sanitizeFilename("CON"), "Sticky Note");

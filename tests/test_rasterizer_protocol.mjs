@@ -1,7 +1,6 @@
 // Automated test for DeskPaper framing protocol and math
 const SYNC_BYTE_1 = 0xAA;
 const SYNC_BYTE_2 = 0x55;
-const CMD_PING = 0x01;
 const CMD_DRAW_BITMAP = 0x10;
 
 function calculateCRC16(buffer) {

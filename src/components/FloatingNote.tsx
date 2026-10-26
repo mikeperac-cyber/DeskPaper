@@ -1,8 +1,7 @@
 import React, { useState, useRef } from "react";
-import { Note, ChecklistItem, NoteColor } from "../types/note";
-import { COLOR_THEMES } from "./ColorPicker";
+import { Note } from "../types/note";
+import { COLOR_THEMES } from "../constants/theme";
 import {
-  Pin,
   X,
   Tv,
   CheckSquare,

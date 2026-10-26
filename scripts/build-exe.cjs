@@ -9,7 +9,7 @@ console.log("[DeskPaper] Building to local temp directory (avoiding OneDrive loc
 if (fs.existsSync(tempOut)) {
   try {
     fs.rmSync(tempOut, { recursive: true, force: true });
-  } catch (e) {}
+  } catch {}
 }
 
 console.log("[DeskPaper] Step 1: Compiling TypeScript and Vite bundle...");

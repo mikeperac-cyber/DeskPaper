@@ -88,15 +88,18 @@ function sanitizeFilename(input, fallback = "Sticky Note") {
     return fallback;
   }
 
-  // Strip control characters (0-31, 127) and invalid filename characters
+  /* oxlint-disable-next-line no-control-regex */
+  /* eslint-disable-next-line no-control-regex */
   let clean = input
     .replace(/[\x00-\x1F\x7F]/g, "")
     .replace(/[\\/:*?"<>|]/g, "_")
-    .replace(/\.\.+/g, "_")
     .trim();
 
   // Strip trailing periods and spaces (problematic on Windows)
   clean = clean.replace(/[.\s]+$/g, "");
+
+  // Convert internal multi-dot sequences (e.g. ..) to _
+  clean = clean.replace(/\.\.+/g, "_");
 
   // Check against Windows reserved file names
   const reservedRegex = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$/i;

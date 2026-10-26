@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Note, HardwareSettings, NoteColor } from "../types/note";
 import { NoteEditor } from "./NoteEditor";
 import { VirtualEPaper } from "./VirtualEPaper";
-import { COLOR_THEMES } from "./ColorPicker";
+import { COLOR_THEMES } from "../constants/theme";
 import {
   Search,
   Tv,

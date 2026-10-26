@@ -6,7 +6,7 @@ const viteChunkPath = path.join(__dirname, "../node_modules/vite/dist/node/chunk
 if (fs.existsSync(viteChunkPath)) {
   let content = fs.readFileSync(viteChunkPath, "utf8");
   const target = "const postfixRE = /[?#].*$/;";
-  const replacement = "const postfixRE = /[?].*$|#[^/\\\\\\]*$/;";
+  const replacement = "const postfixRE = /[?].*$|#[^/\\\\]*$/;";
   if (content.includes(target)) {
     content = content.replace(target, replacement);
     fs.writeFileSync(viteChunkPath, content, "utf8");

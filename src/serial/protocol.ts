@@ -9,20 +9,28 @@ export const CMD_PING = 0x01;
 export const CMD_CLEAR = 0x02;
 export const CMD_DRAW_BITMAP = 0x10;
 
+// Precomputed CRC16-CCITT table for polynomial 0x1021
+const crcTable = new Uint16Array(256);
+for (let i = 0; i < 256; i++) {
+  let curr = i << 8;
+  for (let j = 0; j < 8; j++) {
+    if ((curr & 0x8000) !== 0) {
+      curr = ((curr << 1) ^ 0x1021) & 0xffff;
+    } else {
+      curr = (curr << 1) & 0xffff;
+    }
+  }
+  crcTable[i] = curr;
+}
+
 /**
- * Standard CRC16-CCITT implementation (polynomial 0x1021)
+ * Standard CRC16-CCITT implementation (polynomial 0x1021) using precomputed lookup table
  */
 export function calculateCRC16(buffer: Uint8Array): number {
   let crc = 0xffff;
   for (let i = 0; i < buffer.length; i++) {
-    crc ^= buffer[i] << 8;
-    for (let j = 0; j < 8; j++) {
-      if ((crc & 0x8000) !== 0) {
-        crc = ((crc << 1) ^ 0x1021) & 0xffff;
-      } else {
-        crc = (crc << 1) & 0xffff;
-      }
-    }
+    const idx = ((crc >> 8) ^ buffer[i]) & 0xff;
+    crc = ((crc << 8) ^ crcTable[idx]) & 0xffff;
   }
   return crc;
 }

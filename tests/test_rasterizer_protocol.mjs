@@ -1,47 +1,12 @@
 // Automated test for DeskPaper framing protocol and math
-const SYNC_BYTE_1 = 0xAA;
-const SYNC_BYTE_2 = 0x55;
-const CMD_PING = 0x01;
-const CMD_DRAW_BITMAP = 0x10;
-
-function calculateCRC16(buffer) {
-  let crc = 0xffff;
-  for (let i = 0; i < buffer.length; i++) {
-    crc ^= buffer[i] << 8;
-    for (let j = 0; j < 8; j++) {
-      if ((crc & 0x8000) !== 0) {
-        crc = ((crc << 1) ^ 0x1021) & 0xffff;
-      } else {
-        crc = (crc << 1) & 0xffff;
-      }
-    }
-  }
-  return crc;
-}
-
-function buildBitmapPacket(width, height, bitmapData) {
-  const payloadLen = bitmapData.length;
-  const totalLength = 9 + payloadLen + 2;
-  const packet = new Uint8Array(totalLength);
-
-  packet[0] = SYNC_BYTE_1;
-  packet[1] = SYNC_BYTE_2;
-  packet[2] = CMD_DRAW_BITMAP;
-  packet[3] = (width >> 8) & 0xff;
-  packet[4] = width & 0xff;
-  packet[5] = (height >> 8) & 0xff;
-  packet[6] = height & 0xff;
-  packet[7] = (payloadLen >> 8) & 0xff;
-  packet[8] = payloadLen & 0xff;
-  packet.set(bitmapData, 9);
-
-  const dataForCrc = packet.subarray(0, 9 + payloadLen);
-  const crc = calculateCRC16(dataForCrc);
-
-  packet[9 + payloadLen] = (crc >> 8) & 0xff;
-  packet[9 + payloadLen + 1] = crc & 0xff;
-  return packet;
-}
+import {
+  SYNC_BYTE_1,
+  SYNC_BYTE_2,
+  CMD_PING,
+  CMD_DRAW_BITMAP,
+  calculateCRC16,
+  buildBitmapPacket,
+} from "../src/serial/protocol.ts";
 
 console.log("Running DeskPaper Protocol & Math Verification...");
 
@@ -73,7 +38,7 @@ const packet = buildBitmapPacket(400, 300, dummyBuffer);
 if (packet.length !== 15011) {
   throw new Error("Packet length mismatch: expected 15011, got " + packet.length);
 }
-if (packet[0] !== 0xAA || packet[1] !== 0x55) {
+if (packet[0] !== SYNC_BYTE_1 || packet[1] !== SYNC_BYTE_2) {
   throw new Error("Sync bytes mismatch");
 }
 if (packet[2] !== CMD_DRAW_BITMAP) {
